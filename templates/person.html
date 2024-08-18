@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Person {{ person_id }}</title>
+</head>
+<body>
+    <h1>Images for Person ID: {{ person_id }}</h1>
+    <ul>
+        {% for image in images %}
+            <li>
+                <a href="{{ url_for('show_image', person_id=person_id, image_path=image[0]) }}">
+                    <img src="{{ url_for('uploaded_file', filename=image[0]) }}" style="max-width: 150px;">
+                    <br>Image Path: {{ image[0] }}
+                </a>
+            </li>
+        {% endfor %}
+    </ul>
+    <a href="{{ url_for('list_persons') }}">Back to Persons List</a>
+</body>
+</html>

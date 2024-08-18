@@ -13,16 +13,19 @@ def init_db():
     cur = conn.cursor()
 
     cur.execute('''
-    CREATE TABLE IF NOT EXISTS images (
-        id SERIAL PRIMARY KEY,
-        image_path TEXT,
-        upload_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
+        CREATE TABLE IF NOT EXISTS images (
+            id SERIAL PRIMARY KEY,
+            image_path TEXT NOT NULL,
+            upload_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            origin VARCHAR(10) NOT NULL,
+            url TEXT
+        );
     ''')
 
     cur.execute('''
     CREATE TABLE IF NOT EXISTS persons (
         id SERIAL PRIMARY KEY,
+        name VARCHAR(255) DEFAULT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
     ''')

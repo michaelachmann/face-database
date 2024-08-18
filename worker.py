@@ -84,16 +84,20 @@ def process_image(image_path, image_id):
         print(
             f"face_position['y'] + face_position['h']: {face_position['y'] + face_position['h']}, type: {type(face_position['y'] + face_position['h'])}")
 
+        # Extract the bounding box coordinates
+        x0 = face_position['x']
+        y0 = face_position['y']
+        x1 = face_position['x'] + face_position['w']
+        y1 = face_position['y'] + face_position['h']
+
         # Insert the face embedding with the associated person_id
         cur.execute("""
             INSERT INTO face_embeddings (image_id, person_id, embedding, age, gender, race, emotion, distance, face_position) 
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, box(point(%s,%s), point(%s,%s)));
         """, (
             image_id, person_id, embedding_str, age, selected_gender, race, emotion, distance,
-            face_position['x'], face_position['y'],
-            face_position['x'] + face_position['w'], face_position['y'] + face_position['h']
+            x0, y0, x1, y1
         ))
-
     conn.commit()
     cur.close()
     conn.close()
