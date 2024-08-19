@@ -12,7 +12,7 @@
                         <a href="{{ url_for('show_image', person_id=person_id, image_path=image[0]) }}">
                             <img src="{{ url_for('uploaded_file', filename=image[0]) if image[0] else url_for('static', filename='default_face.jpg') }}"
                                  class="card-img-top img-fluid"
-                                 alt="Cropped Face" style="object-fit: cover; height: 200px; width: 100%;">
+                                 alt="Cropped Face" style="object-fit: cover; height: 300px; width: 100%;">
                         </a>
                         <div class="card-body">
                             <p class="card-text">Image Path: {{ image[0] }}</p>

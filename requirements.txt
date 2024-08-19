@@ -3,3 +3,4 @@ deepface
 psycopg2-binary
 redis
 tf-keras
+hdbscan

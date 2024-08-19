@@ -11,6 +11,9 @@ from deepface import DeepFace
 import uuid
 import os
 import hashlib
+import threading
+import hdbscan
+import time
 
 # Initialize Redis
 redis_client = redis.StrictRedis.from_url(config.REDIS_URL)
@@ -18,6 +21,41 @@ redis_client = redis.StrictRedis.from_url(config.REDIS_URL)
 # Define the backend and alignment mode
 DETECTOR_BACKEND = 'retinaface'  # Choose from the provided backends
 ALIGN_MODE = True  # Whether to align faces
+
+
+
+def perform_clustering():
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    # Fetch all embeddings from the database
+    cur.execute("SELECT id, embedding FROM face_embeddings;")
+    embeddings_data = cur.fetchall()
+
+    if len(embeddings_data) < 2:
+        print("Not enough data to perform clustering.")
+        cur.close()
+        conn.close()
+        return
+
+    # Prepare the embeddings for clustering
+    embedding_ids = [row[0] for row in embeddings_data]
+    embeddings = np.array([np.fromstring(row[1][1:-1], sep=',') for row in embeddings_data])
+
+    # Perform HDBSCAN clustering
+    clusterer = hdbscan.HDBSCAN(min_cluster_size=2, min_samples=1, metric='euclidean', cluster_selection_method='leaf')
+    cluster_labels = clusterer.fit_predict(embeddings)
+
+    # Update the cluster labels in the database
+    for i, cluster_id in enumerate(cluster_labels):
+        cluster_id = int(cluster_id)
+        cur.execute("UPDATE face_embeddings SET cluster_id = %s WHERE id = %s;", (cluster_id, embedding_ids[i]))
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    print(f"Clustering completed. {len(set(cluster_labels))} clusters found.")
 
 
 def calculate_md5(image_data):
@@ -100,13 +138,33 @@ def process_image(image_data, image_key, origin, image_url=None):
     )
     image_id = cur.fetchone()[0]
 
+    # Loop through detected faces to process each
     for i, face in enumerate(face_data):
+        face_position = face['region']
+
+        # Calculate the bounding box coordinates
+        x0 = face_position['x']
+        y0 = face_position['y']
+        x1 = x0 + face_position['w']
+        y1 = y0 + face_position['h']
+
+        # Calculate bounding box area and image area
+        bounding_box_area = (x1 - x0) * (y1 - y0)
+        image_area = img.width * img.height
+
+        # If the bounding box is too large (e.g., >80% of the image area), skip this image
+        if bounding_box_area / image_area > 0.95:
+            print("Face bounding box occupies too much of the image. Skipping image.")
+            redis_client.delete(image_key)  # Clean up Redis
+            cur.close()
+            conn.close()
+            return  # Exit the function without saving or creating any database entry
+
         embedding = embeddings[i]['embedding']
         age = face['age']
         gender = face['gender']
         race = face['dominant_race']
         emotion = face['dominant_emotion']
-        face_position = face['region']
         selected_gender = max(gender, key=gender.get)
 
         # Convert embedding to a format suitable for querying
@@ -118,15 +176,9 @@ def process_image(image_data, image_key, origin, image_url=None):
             FROM face_embeddings
             WHERE embedding <-> %s <= %s
             ORDER BY distance ASC LIMIT 1;
-        """, (embedding_str, embedding_str, 23.56))  # Adjust threshold as needed
+        """, (embedding_str, embedding_str, 21))  # 21 Adjust threshold as needed
 
         result = cur.fetchone()
-
-        # Calculate the bounding box coordinates from face_position
-        x0 = face_position['x']
-        y0 = face_position['y']
-        x1 = x0 + face_position['w']
-        y1 = y0 + face_position['h']
 
         if result is not None:
             person_id, distance = result
@@ -171,7 +223,17 @@ def process_image(image_data, image_key, origin, image_url=None):
     print(f"Processed image {image_id} and saved to {image_path}")
 
 
+def periodic_clustering(interval):
+    while True:
+        perform_clustering()
+        time.sleep(interval)
+
+
 def worker():
+    # Start the periodic clustering in a separate thread
+    clustering_thread = threading.Thread(target=periodic_clustering, args=(600,))  # Run every 10 minutes
+    clustering_thread.start()
+
     while True:
         message = redis_client.blpop('image_queue')[1]
         data = json.loads(message)

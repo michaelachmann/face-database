@@ -229,6 +229,41 @@ def show_image(person_id, image_path):
     return render_template('image.html', image_info=image_info)
 
 
+# Route for displaying clusters
+@app.route('/clusters', methods=['GET'])
+def list_clusters():
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    # Get all clusters and their associated faces
+    cur.execute("""
+        SELECT f.cluster_id, p.id as person_id, p.face_image_path, i.image_path 
+        FROM face_embeddings f 
+        JOIN persons p ON f.person_id = p.id
+        JOIN images i ON f.image_id = i.id
+        WHERE f.cluster_id IS NOT NULL 
+        ORDER BY f.cluster_id, p.id ASC;
+    """)
+    clusters = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    # Group faces by cluster ID
+    clusters_dict = {}
+    for cluster_id, person_id, face_image_path, image_path in clusters:
+        if cluster_id not in clusters_dict:
+            clusters_dict[cluster_id] = []
+        clusters_dict[cluster_id].append({
+            'person_id': person_id,
+            'face_image_path': face_image_path,
+            'image_path': image_path
+        })
+
+    return render_template('clusters.html', clusters=clusters_dict)
+
+
+
 if __name__ == "__main__":
     init_db()
     app.run(debug=True, host="0.0.0.0", port=8080)

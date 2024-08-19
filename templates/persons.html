@@ -9,12 +9,10 @@
                 <div class="col-sm-6 col-md-4 col-lg-3 mb-4">
                     <div class="card">
                         <a href="{{ url_for('show_person', person_id=person[0]) }}">
-
                             <img src="{{ url_for('face_images', filename=person[1]) if person[1] else url_for('static', filename='default_face.png') }}"
                                  class="card-img-top img-fluid"
-                                 alt="Person's Face" style="object-fit: cover; height: 200px; width: 100%;">
-
-                        </a>
+                                 alt="Face Image" style="object-fit: cover; height: 400px; width: 100%;">
+                            </a>
                         <div class="card-body">
                             <h5 class="card-title">Person ID: {{ person[0] }}</h5>
                             <a href="{{ url_for('show_person', person_id=person[0]) }}" class="btn btn-primary">View Details</a>

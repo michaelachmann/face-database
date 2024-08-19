@@ -44,6 +44,7 @@ def init_db():
         emotion TEXT,
         distance FLOAT,
         face_position BOX,
+        cluster_id INT DEFAULT -1,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
     ''')
@@ -51,6 +52,7 @@ def init_db():
     # Create GIST index on face_position
     cur.execute('''
     CREATE INDEX IF NOT EXISTS face_position_idx ON face_embeddings USING GIST (face_position);
+    CREATE INDEX IF NOT EXISTS face_embedding_vector_idx ON face_embeddings USING ivfflat (embedding) WITH (lists = 100);
     ''')
 
     conn.commit()
