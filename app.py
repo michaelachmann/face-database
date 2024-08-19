@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template, send_from_directory
+from flask import Flask, request, flash, redirect, url_for, render_template, send_from_directory
 import redis
 import uuid
 import os
@@ -9,6 +9,7 @@ import json
 from config import config
 from PIL import Image, ImageDraw
 import ast
+import base64
 
 app = Flask(__name__)
 app.config.from_object(config)
@@ -21,14 +22,18 @@ if not os.path.exists('uploads'):
     os.makedirs('uploads')
 
 # Allowed extensions
-ALLOWED_EXTENSIONS = {'jpg', 'jpeg', 'png', 'tiff'}
+ALLOWED_EXTENSIONS = {'jpg', 'jpeg', 'png', 'tiff', 'tif'}
 # Directory for uploaded images
 UPLOAD_FOLDER = 'uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
+@app.route('/uploads/<filename>')
 def uploaded_file(filename):
-    return s@app.route('/uploads/<filename>')
-end_from_directory(app.config['UPLOAD_FOLDER'], filename)
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+@app.route('/uploads/faces/<filename>')
+def face_images(filename):
+    return send_from_directory(f"{app.config['UPLOAD_FOLDER']}/faces", filename)
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -42,26 +47,26 @@ def convert_image(image, format='JPEG'):
     output.seek(0)
     return output
 
+
+
 @app.route('/', methods=['GET', 'POST'])
 def upload_image():
     if request.method == 'POST':
         origin = ''
-        image_url = None
+        image_data = None
+        image_key = f"image:{uuid.uuid4()}"
 
         if 'image_file' in request.files and request.files['image_file'].filename != '':
             file = request.files['image_file']
             if allowed_file(file.filename):
-                unique_filename = f"{uuid.uuid4()}.jpg"
-                image_path = os.path.join('uploads', unique_filename)
-
-                # Convert and save the image as JPEG
+                # Convert the uploaded file to JPEG in memory
                 converted_image = convert_image(file, format='JPEG')
-                with open(image_path, 'wb') as f:
-                    f.write(converted_image.getbuffer())
-
+                image_data = converted_image.getvalue()  # Get the bytes data
                 origin = 'local'
+                flash('Image uploaded successfully from disk!', 'success')
             else:
-                return jsonify({"status": "error", "message": "Invalid file type"}), 400
+                flash('Invalid file type. Please upload a valid image file.', 'error')
+                return redirect(url_for('upload_image'))
 
         elif 'image_url' in request.form and request.form['image_url'] != '':
             image_url = request.form['image_url']
@@ -69,41 +74,55 @@ def upload_image():
             if response.status_code == 200:
                 img = Image.open(BytesIO(response.content))
                 if img.format.lower() in ALLOWED_EXTENSIONS:
-                    unique_filename = f"{uuid.uuid4()}.jpg"
-                    image_path = os.path.join('uploads', unique_filename)
-
-                    # Convert and save the image as JPEG
+                    # Convert the image to JPEG in memory
                     converted_image = convert_image(BytesIO(response.content), format='JPEG')
-                    with open(image_path, 'wb') as f:
-                        f.write(converted_image.getbuffer())
-
+                    image_data = converted_image.getvalue()  # Get the bytes data
                     origin = 'url'
+                    flash('Image uploaded successfully from URL!', 'success')
                 else:
-                    return jsonify({"status": "error", "message": "Invalid image format from URL"}), 400
+                    flash('Invalid image format from URL. Please provide a valid image URL.', 'error')
+                    return redirect(url_for('upload_image'))
             else:
-                return jsonify({"status": "error", "message": "Failed to download image"}), 400
+                flash('Failed to download image from URL. Please check the URL and try again.', 'error')
+                return redirect(url_for('upload_image'))
+
+        elif 'image_base64' in request.form and request.form['image_base64'] != '':
+            image_base64 = request.form['image_base64']
+
+            try:
+                # Decode the base64 string and convert it to an image
+                image_data = base64.b64decode(image_base64)
+                img = Image.open(BytesIO(image_data))
+
+                if img.format.lower() in ALLOWED_EXTENSIONS:
+                    # Convert the image to JPEG in memory
+                    converted_image = convert_image(BytesIO(image_data), format='JPEG')
+                    image_data = converted_image.getvalue()  # Get the bytes data
+                    origin = 'base64'
+                    flash('Image uploaded successfully from base64 string!', 'success')
+                else:
+                    flash('Invalid image format from base64 string. Please provide a valid image.', 'error')
+                    return redirect(url_for('upload_image'))
+
+            except (base64.binascii.Error, IOError) as e:
+                flash(f'Failed to decode and process base64 image: {str(e)}', 'error')
+                return redirect(url_for('upload_image'))
+
         else:
-            return jsonify({"status": "error", "message": "No image provided"}), 400
+            flash('No image provided. Please upload an image, provide a URL, or a base64 string.', 'error')
+            return redirect(url_for('upload_image'))
 
-        # Store the image path, origin, and URL (if applicable) in the database
+        # Save the image data to Redis
+        if image_data:
+            redis_client.set(image_key, image_data)
+            redis_client.rpush('image_queue', json.dumps({
+                'image_key': image_key,
+                'origin': origin,
+                'image_url': request.form.get('image_url', None)  # Add URL if available
+            }))
+            flash(f"Image successfully uploaded and queued for processing (key: {image_key})", 'success')
 
-        filename = image_path.split('/')[-1]
-
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute(
-            "INSERT INTO images (image_path, origin, url) VALUES (%s, %s, %s) RETURNING id;",
-            (filename, origin, image_url)
-        )
-        image_id = cur.fetchone()[0]
-        conn.commit()
-        cur.close()
-        conn.close()
-
-        # Add the image path to the Redis queue for processing
-        redis_client.rpush('image_queue', json.dumps({'image_path': image_path, 'image_id': image_id}))
-
-        return jsonify({"status": "success", "image_id": image_id})
+        return redirect(url_for('upload_image'))
 
     return render_template('upload.html')
 
@@ -115,8 +134,8 @@ def list_persons():
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # Get all unique persons
-    cur.execute("SELECT DISTINCT person_id FROM face_embeddings ORDER BY person_id ASC;")
+    # Get all persons with their face image paths
+    cur.execute("SELECT id, face_image_path FROM persons ORDER BY id ASC;")
     persons = cur.fetchall()
 
     cur.close()
@@ -124,17 +143,19 @@ def list_persons():
 
     return render_template('persons.html', persons=persons)
 
+
 # Route for displaying all images associated with a person
 @app.route('/person/<int:person_id>', methods=['GET'])
 def show_person(person_id):
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # Get all images where this person appears
+    # Get all images and the cropped face image path where this person appears
     cur.execute("""
-        SELECT i.image_path, f.face_position 
+        SELECT i.image_path, f.face_position, p.face_image_path
         FROM images i 
         JOIN face_embeddings f ON i.id = f.image_id 
+        JOIN persons p ON f.person_id = p.id
         WHERE f.person_id = %s
         ORDER BY i.upload_time DESC;
     """, (person_id,))
@@ -153,12 +174,13 @@ def show_image(person_id, image_path):
 
     # Get the face and metadata in this image for the given person_id
     cur.execute("""
-        SELECT f.person_id, f.age, f.gender, f.race, f.emotion, f.face_position 
+        SELECT f.person_id, f.age, f.gender, f.race, f.emotion, f.face_position, f.distance, i.origin, i.url
         FROM images i 
         JOIN face_embeddings f ON i.id = f.image_id 
         WHERE i.image_path = %s AND f.person_id = %s;
     """, (image_path, person_id))
     face = cur.fetchone()  # Expecting only one face
+
 
     cur.close()
     conn.close()
@@ -171,7 +193,7 @@ def show_image(person_id, image_path):
     image = Image.open(image_full_path)
     draw = ImageDraw.Draw(image)
 
-    bbox = face[5]  # face_position
+    bbox = face[5]  # face_position, now directly use the tuple of coordinates
     if bbox:
         # Parse the bbox string
         bbox = ast.literal_eval(f"[{bbox}]")  # Converts the string to a list of tuples
@@ -189,8 +211,22 @@ def show_image(person_id, image_path):
     processed_image_path = os.path.join(app.config['UPLOAD_FOLDER'], f"processed_{os.path.basename(image_path)}")
     image.save(processed_image_path)
 
-    return render_template('image.html', image_path=f"processed_{os.path.basename(image_path)}", face=face)
+    # Prepare data for rendering the template
+    image_info = {
+        "image_path": f"processed_{os.path.basename(image_path)}",
+        "person_id": face[0],
+        "age": face[1],
+        "gender": face[2],
+        "race": face[3],
+        "emotion": face[4],
+        "bbox": face[5],
+        "distance": face[6],  # Add the distance value here
+        "origin": face[7],
+        "url": face[8],
+    }
 
+    # Render the template with the image, face metadata, and additional info
+    return render_template('image.html', image_info=image_info)
 
 
 if __name__ == "__main__":

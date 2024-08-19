@@ -18,7 +18,8 @@ def init_db():
             image_path TEXT NOT NULL,
             upload_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             origin VARCHAR(10) NOT NULL,
-            url TEXT
+            url TEXT,
+            md5_hash TEXT UNIQUE NOT NULL
         );
     ''')
 
@@ -26,6 +27,7 @@ def init_db():
     CREATE TABLE IF NOT EXISTS persons (
         id SERIAL PRIMARY KEY,
         name VARCHAR(255) DEFAULT NULL,
+        face_image_path TEXT DEFAULT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
     ''')

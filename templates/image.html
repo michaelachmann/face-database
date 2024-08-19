@@ -7,17 +7,28 @@
 </head>
 <body>
     <h1>Image Details</h1>
-    <img src="{{ url_for('uploaded_file', filename=image_path) }}" style="max-width: 500px;">
+
+    <!-- Display the processed image -->
+    <img src="{{ url_for('uploaded_file', filename=image_info['image_path']) }}" style="max-width: 500px;">
+
+    <!-- Display the face metadata -->
     <ul>
-            <li>
-                <strong>Person ID:</strong> {{ face[0] }}<br>
-                <strong>Age:</strong> {{ face[1] }}<br>
-                <strong>Gender:</strong> {{ face[2] }}<br>
-                <strong>Race:</strong> {{ face[3] }}<br>
-                <strong>Emotion:</strong> {{ face[4] }}<br>
-                <strong>Bounding Box:</strong> {{ face[5] }}<br>
-            </li>
+        <li><strong>Person ID:</strong> {{ image_info['person_id'] }}</li>
+        <li><strong>Distance:</strong> {{ image_info['distance'] }}</li>
+        <li><strong>Age:</strong> {{ image_info['age'] }}</li>
+        <li><strong>Gender:</strong> {{ image_info['gender'] }}</li>
+        <li><strong>Race:</strong> {{ image_info['race'] }}</li>
+        <li><strong>Emotion:</strong> {{ image_info['emotion'] }}</li>
+        <li><strong>Bounding Box:</strong> {{ image_info['bbox'] }}</li>
+        <li><strong>Source:</strong> {{ image_info['origin'] }}</li>
+        {% if image_info['url'] %}
+        <li><strong>URL:</strong> <a href="{{ image_info['url'] }}">{{ image_info['url'] }}</a></li>
+        {% else %}
+        <li><strong>URL:</strong> Not available</li>
+        {% endif %}
     </ul>
-    <a href="{{ url_for('show_person', person_id=face[0]) }}">Back to Person</a>
+
+    <!-- Link back to the person details -->
+    <a href="{{ url_for('show_person', person_id=image_info['person_id']) }}">Back to Person</a>
 </body>
 </html>
