@@ -1,36 +1,26 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Upload Image</title>
-</head>
-<body>
-    <h1>Upload Image</h1>
+<!-- templates/upload.html -->
+{% extends "base.html" %}
 
-    <!-- Display flash messages -->
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            <ul>
-                {% for category, message in messages %}
-                    <li class="{{ category }}">{{ message }}</li>
-                {% endfor %}
-            </ul>
-        {% endif %}
-    {% endwith %}
+{% block title %}Upload Image{% endblock %}
 
-    <form action="/" method="post" enctype="multipart/form-data">
-        <label for="image_file">Upload from disk:</label>
-        <input type="file" id="image_file" name="image_file"><br><br>
+{% block content %}
+<h1>Upload Image</h1>
+<form action="{{ url_for('upload_image') }}" method="post" enctype="multipart/form-data">
+    <div class="mb-3">
+        <label for="image_file" class="form-label">Upload from Disk:</label>
+        <input type="file" id="image_file" name="image_file" class="form-control">
+    </div>
 
-        <label for="image_url">Or paste a URL:</label>
-        <input type="text" id="image_url" name="image_url"><br><br>
+    <div class="mb-3">
+        <label for="image_url" class="form-label">Or Paste a URL:</label>
+        <input type="text" id="image_url" name="image_url" class="form-control">
+    </div>
 
-        <label for="image_base64">Or paste a Base64 string:</label>
-        <textarea id="image_base64" name="image_base64" rows="4" cols="50"></textarea><br><br>
+    <div class="mb-3">
+        <label for="image_base64" class="form-label">Or Paste a Base64 String:</label>
+        <textarea id="image_base64" name="image_base64" rows="4" class="form-control"></textarea>
+    </div>
 
-
-        <input type="submit" value="Upload">
-    </form>
-</body>
-</html>
+    <button type="submit" class="btn btn-primary">Upload</button>
+</form>
+{% endblock %}

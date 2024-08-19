@@ -1,14 +1,9 @@
 <!-- templates/person.html -->
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Person {{ person_id }}</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body>
-    <div class="container mt-4">
+{% extends "base.html" %}
+
+{% block title %}Person {{ person_id }}{% endblock %}
+
+{% block content %}
         <h1>Images for Person ID: {{ person_id }}</h1>
         <div class="row">
             {% for image in images %}
@@ -26,8 +21,5 @@
                 </div>
             {% endfor %}
         </div>
-        <a href="{{ url_for('list_persons') }}" class="btn btn-secondary mt-4">Back to Persons List</a>
-    </div>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+<a href="{{ url_for('list_persons') }}" class="btn btn-secondary mt-4">Back to Persons List</a>
+{% endblock %}
