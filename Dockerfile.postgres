@@ -1,0 +1,22 @@
+# Dockerfile for PostgreSQL with pgvector extension
+FROM postgres:13
+
+# Install required packages including git
+RUN apt-get update && apt-get install -y \
+    postgresql-server-dev-13 \
+    git \
+    make \
+    gcc
+
+# Clone and install pgvector
+RUN git clone https://github.com/pgvector/pgvector.git \
+    && cd pgvector \
+    && make \
+    && make install
+
+# Clean up
+RUN apt-get remove --purge -y postgresql-server-dev-13 git make gcc \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf pgvector
+

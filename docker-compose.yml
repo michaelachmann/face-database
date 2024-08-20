@@ -2,10 +2,12 @@ version: '3.8'
 
 services:
   postgres:
-    image: postgres:13
+    build:
+      context: .
+      dockerfile: Dockerfile.postgres
     environment:
-      POSTGRES_USER: myuser
-      POSTGRES_PASSWORD: mypassword
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
       POSTGRES_DB: face_recognition
     ports:
       - "5432:5432"
@@ -19,12 +21,12 @@ services:
 
   web:
     build: .
-    command: flask run --host=0.0.0.0
+    command: bash -c "python db.py && python worker.py & flask run --host=0.0.0.0 --port=8080"
     volumes:
       - .:/app
       - uploads_data:/app/uploads  # Persist uploads folder
     ports:
-      - "5000:5000"
+      - "8080:8080"
     depends_on:
       - postgres
       - redis

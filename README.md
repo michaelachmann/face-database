@@ -37,7 +37,7 @@ This repository contains a Flask-based web application that allows users to uplo
     docker-compose up --build
     ```
 
-3. Access the application in your browser at `http://localhost:5000`.
+3. Access the application in your browser at `http://localhost:8080`.
 
 ## Usage
 

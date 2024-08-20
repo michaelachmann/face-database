@@ -27,16 +27,23 @@ ALLOWED_EXTENSIONS = {'jpg', 'jpeg', 'png', 'tiff', 'tif'}
 UPLOAD_FOLDER = 'uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
+
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
 
 @app.route('/uploads/faces/<filename>')
 def face_images(filename):
     return send_from_directory(f"{app.config['UPLOAD_FOLDER']}/faces", filename)
 
+
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def add_base64_padding(base64_string):
+    return base64_string + '=' * (-len(base64_string) % 4)
+
 
 def convert_image(image, format='JPEG'):
     """Convert image to a specific format (default: JPEG)."""
@@ -46,7 +53,6 @@ def convert_image(image, format='JPEG'):
     img.save(output, format=format)
     output.seek(0)
     return output
-
 
 
 @app.route('/', methods=['GET', 'POST'])
@@ -68,28 +74,14 @@ def upload_image():
                 flash('Invalid file type. Please upload a valid image file.', 'error')
                 return redirect(url_for('upload_image'))
 
-        elif 'image_url' in request.form and request.form['image_url'] != '':
-            image_url = request.form['image_url']
-            response = requests.get(image_url)
-            if response.status_code == 200:
-                img = Image.open(BytesIO(response.content))
-                if img.format.lower() in ALLOWED_EXTENSIONS:
-                    # Convert the image to JPEG in memory
-                    converted_image = convert_image(BytesIO(response.content), format='JPEG')
-                    image_data = converted_image.getvalue()  # Get the bytes data
-                    origin = 'url'
-                    flash('Image uploaded successfully from URL!', 'success')
-                else:
-                    flash('Invalid image format from URL. Please provide a valid image URL.', 'error')
-                    return redirect(url_for('upload_image'))
-            else:
-                flash('Failed to download image from URL. Please check the URL and try again.', 'error')
-                return redirect(url_for('upload_image'))
 
         elif 'image_base64' in request.form and request.form['image_base64'] != '':
             image_base64 = request.form['image_base64']
 
             try:
+                # Fix the padding if necessary
+                image_base64 = add_base64_padding(image_base64)
+
                 # Decode the base64 string and convert it to an image
                 image_data = base64.b64decode(image_base64)
                 img = Image.open(BytesIO(image_data))
@@ -106,6 +98,25 @@ def upload_image():
 
             except (base64.binascii.Error, IOError) as e:
                 flash(f'Failed to decode and process base64 image: {str(e)}', 'error')
+                return redirect(url_for('upload_image'))
+
+
+        elif 'image_url' in request.form and request.form['image_url'] != '':
+            image_url = request.form['image_url']
+            response = requests.get(image_url)
+            if response.status_code == 200:
+                img = Image.open(BytesIO(response.content))
+                if img.format.lower() in ALLOWED_EXTENSIONS:
+                    # Convert the image to JPEG in memory
+                    converted_image = convert_image(BytesIO(response.content), format='JPEG')
+                    image_data = converted_image.getvalue()  # Get the bytes data
+                    origin = 'url'
+                    flash('Image uploaded successfully from URL!', 'success')
+                else:
+                    flash('Invalid image format from URL. Please provide a valid image URL.', 'error')
+                    return redirect(url_for('upload_image'))
+            else:
+                flash('Failed to download image from URL. Please check the URL and try again.', 'error')
                 return redirect(url_for('upload_image'))
 
         else:
@@ -125,7 +136,6 @@ def upload_image():
         return redirect(url_for('upload_image'))
 
     return render_template('upload.html')
-
 
 
 # Route for displaying the list of persons
@@ -166,6 +176,7 @@ def show_person(person_id):
 
     return render_template('person.html', person_id=person_id, images=images)
 
+
 # Route for displaying details of a specific image and face
 @app.route('/person/<int:person_id>/image/<path:image_path>', methods=['GET'])
 def show_image(person_id, image_path):
@@ -180,7 +191,6 @@ def show_image(person_id, image_path):
         WHERE i.image_path = %s AND f.person_id = %s;
     """, (image_path, person_id))
     face = cur.fetchone()  # Expecting only one face
-
 
     cur.close()
     conn.close()
@@ -261,7 +271,6 @@ def list_clusters():
         })
 
     return render_template('clusters.html', clusters=clusters_dict)
-
 
 
 if __name__ == "__main__":

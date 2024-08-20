@@ -12,6 +12,9 @@ def init_db():
     conn = get_db_connection()
     cur = conn.cursor()
 
+    # Enable the pgvector extension
+    cur.execute("CREATE EXTENSION IF NOT EXISTS vector;")
+
     cur.execute('''
         CREATE TABLE IF NOT EXISTS images (
             id SERIAL PRIMARY KEY,
