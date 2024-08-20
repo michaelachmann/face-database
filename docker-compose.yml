@@ -25,6 +25,7 @@ services:
     volumes:
       - .:/app
       - uploads_data:/app/uploads  # Persist uploads folder
+      - deepface_data:/root/.deepface  # Persist .deepface folder
     ports:
       - "8080:8080"
     depends_on:
@@ -34,3 +35,4 @@ services:
 volumes:
   postgres_data:
   uploads_data:  # Define the named volume for uploads
+  deepface_data:

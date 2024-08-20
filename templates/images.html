@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+
+{% block title %}Image Gallery{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">Image Gallery</h1>
+
+    <!-- Filter Form -->
+    <form method="GET" action="{{ url_for('list_images') }}" class="mb-4">
+        <div class="row">
+            <div class="col-md-2">
+                <label for="person_id">Person ID</label>
+                <input type="number" class="form-control" id="person_id" name="person_id" value="{{ request.args.get('person_id', '') }}">
+            </div>
+            <div class="col-md-2">
+                <label for="gender">Gender</label>
+                <select class="form-control" id="gender" name="gender">
+                    <option value="">All</option>
+                    <option value="Man" {% if request.args.get('gender') == 'Man' %}selected{% endif %}>Male</option>
+                    <option value="Woman" {% if request.args.get('gender') == 'Woman' %}selected{% endif %}>Female</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="race">Race</label>
+                <select class="form-control" id="race" name="race">
+                    <option value="">All</option>
+                    {% for race in race_categories %}
+                    <option value="{{ race }}" {% if request.args.get('race') == race %}selected{% endif %}>{{ race }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="age">Age</label>
+                <input type="number" class="form-control" id="age" name="age" value="{{ request.args.get('age', '') }}">
+            </div>
+            <div class="col-md-2">
+                <label for="cluster_id">Cluster ID</label>
+                <input type="number" class="form-control" id="cluster_id" name="cluster_id" value="{{ request.args.get('cluster_id', '') }}">
+            </div>
+            <div class="col-md-2">
+                <label for="per_page">Items Per Page</label>
+                <select class="form-control" id="per_page" name="per_page">
+                    <option value="12" {% if request.args.get('per_page') == '12' %}selected{% endif %}>12</option>
+                    <option value="24" {% if request.args.get('per_page') == '24' %}selected{% endif %}>24</option>
+                    <option value="48" {% if request.args.get('per_page') == '48' %}selected{% endif %}>48</option>
+                </select>
+            </div>
+        </div>
+        <div class="row mt-3">
+            <div class="col-md-12 text-right">
+                <button type="submit" class="btn btn-primary">Apply Filters</button>
+            </div>
+        </div>
+    </form>
+
+<div class="btn-group mb-4" role="group" aria-label="Sorting Options">
+    <a href="{{ url_for('list_images', sort_by='upload_time', sort_order='asc', page=page, per_page=per_page, person_id=request.args.get('person_id'), gender=request.args.get('gender'), race=request.args.get('race'), age=request.args.get('age'), cluster_id=request.args.get('cluster_id')) }}" class="btn btn-outline-secondary">Upload Time (Asc)</a>
+    <a href="{{ url_for('list_images', sort_by='upload_time', sort_order='desc', page=page, per_page=per_page, person_id=request.args.get('person_id'), gender=request.args.get('gender'), race=request.args.get('race'), age=request.args.get('age'), cluster_id=request.args.get('cluster_id')) }}" class="btn btn-outline-secondary">Upload Time (Desc)</a>
+    <a href="{{ url_for('list_images', sort_by='age', sort_order='asc', page=page, per_page=per_page, person_id=request.args.get('person_id'), gender=request.args.get('gender'), race=request.args.get('race'), age=request.args.get('age'), cluster_id=request.args.get('cluster_id')) }}" class="btn btn-outline-secondary">Age (Asc)</a>
+    <a href="{{ url_for('list_images', sort_by='age', sort_order='desc', page=page, per_page=per_page, person_id=request.args.get('person_id'), gender=request.args.get('gender'), race=request.args.get('race'), age=request.args.get('age'), cluster_id=request.args.get('cluster_id')) }}" class="btn btn-outline-secondary">Age (Desc)</a>
+    <a href="{{ url_for('list_images', sort_by='distance', sort_order='asc', page=page, per_page=per_page, person_id=request.args.get('person_id'), gender=request.args.get('gender'), race=request.args.get('race'), age=request.args.get('age'), cluster_id=request.args.get('cluster_id')) }}" class="btn btn-outline-secondary">Distance (Asc)</a>
+    <a href="{{ url_for('list_images', sort_by='distance', sort_order='desc', page=page, per_page=per_page, person_id=request.args.get('person_id'), gender=request.args.get('gender'), race=request.args.get('race'), age=request.args.get('age'), cluster_id=request.args.get('cluster_id')) }}" class="btn btn-outline-secondary">Distance (Desc)</a>
+</div>
+
+
+
+    <!-- Image Grid -->
+    <div class="row">
+        {% for image in images %}
+        <div class="col-sm-6 col-md-4 col-lg-3 mb-4">
+            <div class="card h-100">
+                <a href="{{ url_for('show_image', person_id=image[1], image_path=image[0]) }}">
+                    <img src="{{ url_for('uploaded_file', filename=image[0]) }}" class="card-img-top img-fluid" style="object-fit: cover; height: 300px; width: 100%;" alt="Image">
+                </a>
+                <div class="card-body d-flex flex-column">
+                    <p class="card-text"><a href="{{ url_for('show_person', person_id=image[1]) }}" class="mt-auto btn btn-block btn-info">Person {{ image[1] }}</a></p>
+                    <p class="card-text"><strong>Age:</strong> {{ image[2] }}</p>
+                    <p class="card-text"><strong>Gender:</strong> {{ image[3] }}</p>
+                    <p class="card-text"><strong>Race:</strong> {{ image[4] }}</p>
+                    <p class="card-text"><strong>Upload Time:</strong> {{ image[6] }}</p>
+                    <p class="card-text"><a href="{{ url_for('show_cluster', cluster_id=image[8]) }}" class="mt-auto btn btn-block btn-info">Cluster {{ image[8] }}</a></p>
+                    <a href="{{ url_for('show_image', person_id=image[1], image_path=image[0]) }}" class="mt-auto btn btn-primary">View Details</a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Pagination -->
+<nav aria-label="Page navigation">
+    <ul class="pagination justify-content-center">
+        {% if page > 1 %}
+            <li class="page-item">
+                <a class="page-link" href="{{ url_for('list_images', page=1, per_page=per_page, sort_by=sort_by, sort_order=sort_order, person_id=request.args.get('person_id'), gender=request.args.get('gender'), race=request.args.get('race')) }}">
+                    First
+                </a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="{{ url_for('list_images', page=page-1, per_page=per_page, sort_by=sort_by, sort_order=sort_order, person_id=request.args.get('person_id'), gender=request.args.get('gender'), race=request.args.get('race')) }}">
+                    Previous
+                </a>
+            </li>
+        {% endif %}
+
+        {% set page_range = 3 %} <!-- Number of pages to show around the current page -->
+        {% set start_page = max(1, page - page_range) %}
+        {% set end_page = min(total_pages, page + page_range) %}
+
+        {% if start_page > 1 %}
+            <li class="page-item">
+                <a class="page-link" href="{{ url_for('list_images', page=1, per_page=per_page, sort_by=sort_by, sort_order=sort_order, person_id=request.args.get('person_id'), gender=request.args.get('gender'), race=request.args.get('race')) }}">
+                    1
+                </a>
+            </li>
+            {% if start_page > 2 %}
+                <li class="page-item disabled">
+                    <span class="page-link">...</span>
+                </li>
+            {% endif %}
+        {% endif %}
+
+        {% for page_num in range(start_page, end_page + 1) %}
+            <li class="page-item {% if page_num == page %}active{% endif %}">
+                <a class="page-link" href="{{ url_for('list_images', page=page_num, per_page=per_page, sort_by=sort_by, sort_order=sort_order, person_id=request.args.get('person_id'), gender=request.args.get('gender'), race=request.args.get('race')) }}">
+                    {{ page_num }}
+                </a>
+            </li>
+        {% endfor %}
+
+        {% if end_page < total_pages %}
+            {% if end_page < total_pages - 1 %}
+                <li class="page-item disabled">
+                    <span class="page-link">...</span>
+                </li>
+            {% endif %}
+            <li class="page-item">
+                <a class="page-link" href="{{ url_for('list_images', page=total_pages, per_page=per_page, sort_by=sort_by, sort_order=sort_order, person_id=request.args.get('person_id'), gender=request.args.get('gender'), race=request.args.get('race')) }}">
+                    {{ total_pages }}
+                </a>
+            </li>
+        {% endif %}
+
+        {% if page < total_pages %}
+            <li class="page-item">
+                <a class="page-link" href="{{ url_for('list_images', page=page+1, per_page=per_page, sort_by=sort_by, sort_order=sort_order, person_id=request.args.get('person_id'), gender=request.args.get('gender'), race=request.args.get('race')) }}">
+                    Next
+                </a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="{{ url_for('list_images', page=total_pages, per_page=per_page, sort_by=sort_by, sort_order=sort_order, person_id=request.args.get('person_id'), gender=request.args.get('gender'), race=request.args.get('race')) }}">
+                    Last
+                </a>
+            </li>
+        {% endif %}
+    </ul>
+</nav>
+
+
+{% endblock %}

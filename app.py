@@ -513,6 +513,101 @@ def analyze_overlap():
     return render_template('analysis_overlap.html', overlap_dict=overlap_dict)
 
 
+@app.route('/images', methods=['GET'])
+def list_images():
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    race_categories = [
+        "asian",
+        "black",
+        "indian",
+        "latino hispanic",
+        "middle eastern",
+        "white"
+    ]
+
+    # Get filter, sorting, and pagination parameters from the request
+    person_id = request.args.get('person_id', default=None, type=int)
+    gender = request.args.get('gender', default=None, type=str)
+    race = request.args.get('race', default=None, type=str)
+    age = request.args.get('age', default=None, type=int)
+    cluster_id = request.args.get('cluster_id', default=None, type=int)
+    sort_by = request.args.get('sort_by', default='upload_time', type=str)
+    sort_order = request.args.get('sort_order', default='desc', type=str)
+    page = request.args.get('page', default=1, type=int)
+    per_page = request.args.get('per_page', default=12, type=int)
+
+    # Build the base query
+    query = """
+        SELECT i.image_path, f.person_id, f.age, f.gender, f.race, f.emotion, i.upload_time, f.distance, f.cluster_id
+        FROM images i
+        JOIN face_embeddings f ON i.id = f.image_id
+        WHERE 1=1
+    """
+
+    # Add filters to the query
+    params = []
+    if person_id:
+        query += " AND f.person_id = %s"
+        params.append(person_id)
+    if gender:
+        query += " AND f.gender = %s"
+        params.append(gender)
+    if race:
+        query += " AND f.race = %s"
+        params.append(race)
+    if age:
+        query += " AND f.age = %s"
+        params.append(age)
+    if cluster_id:
+        query += " AND f.cluster_id = %s"
+        params.append(cluster_id)
+
+    # Add sorting to the query
+    query += f" ORDER BY {sort_by} {sort_order}"
+
+    # Add pagination to the query
+    offset = (page - 1) * per_page
+    query += " LIMIT %s OFFSET %s"
+    params.extend([per_page, offset])
+
+    cur.execute(query, tuple(params))
+    images = cur.fetchall()
+
+    # Get the total number of images for pagination
+    cur.execute("""
+        SELECT COUNT(*)
+        FROM images i
+        JOIN face_embeddings f ON i.id = f.image_id
+        WHERE 1=1
+    """ + (" AND f.person_id = %s" if person_id else "") + \
+         (" AND f.gender = %s" if gender else "") + \
+         (" AND f.race = %s" if race else "") + \
+         (" AND f.age = %s" if age else "") + \
+         (" AND f.cluster_id = %s" if cluster_id else ""),
+        tuple(params[:len(params) - 2])  # Exclude LIMIT and OFFSET params
+    )
+    total_images = cur.fetchone()[0]
+
+    cur.close()
+    conn.close()
+
+    # Calculate total pages
+    total_pages = (total_images + per_page - 1) // per_page
+
+    return render_template('images.html',
+                           images=images,
+                           page=page,
+                           per_page=per_page,
+                           total_pages=total_pages,
+                           sort_by=sort_by,
+                           sort_order=sort_order,
+                           max=max,
+                           min=min,
+                           race_categories=race_categories)
+
+
 
 if __name__ == "__main__":
     init_db()

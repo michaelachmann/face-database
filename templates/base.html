@@ -42,7 +42,10 @@
                             <a class="nav-link" href="{{ url_for('upload_image') }}">Upload Image</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('list_persons') }}">View Persons</a>
+                            <a class="nav-link" href="{{ url_for('list_images') }}">View Images</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('list_persons') }}">View People</a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('list_clusters') }}">View Clusters</a>
@@ -81,6 +84,11 @@
         </footer>
     </div>
 
+
+<!-- jQuery first, then Popper.js, then Bootstrap JS -->
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
 </body>
 </html>

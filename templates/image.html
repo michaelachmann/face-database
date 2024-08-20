@@ -8,7 +8,7 @@
 
     <!-- Display the processed image -->
     <div class="text-center mb-4">
-        <img src="{{ url_for('uploaded_file', filename=image_info['image_path']) }}" class="img-fluid rounded" style="max-width: 500px;" alt="Processed Image">
+        <img src="{{ url_for('uploaded_file', filename=image_info['image_path']) }}" class="img-fluid rounded" style="max-width: 100%;" alt="Processed Image">
     </div>
 
     <!-- Display the face metadata -->
@@ -16,7 +16,7 @@
         <div class="card-body">
             <h5 class="card-title">Face Metadata</h5>
             <ul class="list-group list-group-flush">
-                <li class="list-group-item"><strong>Person ID:</strong> {{ image_info['person_id'] }}</li>
+                <li class="list-group-item"><a href="{{ url_for('show_person', person_id=image_info['person_id']) }}" class="mt-auto btn btn-info">Person {{ image_info['person_id'] }}</a></li>
                 <li class="list-group-item"><strong>Distance:</strong> {{ image_info['distance'] }}</li>
                 <li class="list-group-item"><strong>Age:</strong> {{ image_info['age'] }}</li>
                 <li class="list-group-item"><strong>Gender:</strong> {{ image_info['gender'] }}</li>
