@@ -1,25 +1,36 @@
-<!-- templates/person.html -->
 {% extends "base.html" %}
 
 {% block title %}Person {{ person_id }}{% endblock %}
 
 {% block content %}
-        <h1>Images for Person ID: {{ person_id }}</h1>
-        <div class="row">
-            {% for image in images %}
-                <div class="col-sm-6 col-md-4 col-lg-3 mb-4">
-                    <div class="card">
-                        <a href="{{ url_for('show_image', person_id=person_id, image_path=image[0]) }}">
-                            <img src="{{ url_for('uploaded_file', filename=image[0]) if image[0] else url_for('static', filename='default_face.jpg') }}"
-                                 class="card-img-top img-fluid"
-                                 alt="Cropped Face" style="object-fit: cover; height: 300px; width: 100%;">
-                        </a>
-                        <div class="card-body">
-                            <p class="card-text">Image Path: {{ image[0] }}</p>
-                        </div>
+    <h1>Details for {{ person_details[0] if person_details[0] else 'Person ID: ' + person_id|string }}</h1>
+    <ul class="list-group mb-4">
+        <li class="list-group-item"><strong>Name:</strong> {{ person_details[0] if person_details[0] else 'N/A' }}</li>
+        <li class="list-group-item"><strong>Mean Age:</strong> {{ person_details[1]|round(1) if person_details[1] else 'N/A' }}</li>
+        <li class="list-group-item"><strong>Image Count:</strong> {{ person_details[2] }}</li>
+    </ul>
+
+    <h2>Images</h2>
+    <div class="row">
+        {% for image in images %}
+            <div class="col-sm-6 col-md-4 col-lg-3 mb-4">
+                <div class="card">
+                    <a href="{{ url_for('show_image', person_id=person_id, image_path=image[0]) }}">
+                        <img src="{{ url_for('uploaded_file', filename=image[0]) if image[0] else url_for('static', filename='default_face.jpg') }}"
+                             class="card-img-top img-fluid"
+                             alt="Cropped Face" style="object-fit: cover; height: 300px; width: 100%;">
+                    </a>
+                    <div class="card-body">
+                        <p class="card-text"><strong>Upload Time:</strong> {{ image[3] }}</p>
+                        <p class="card-text"><strong>Origin:</strong> {{ image[4] }}</p>
+                        {% if image[5] %}
+                            <p class="card-text"><strong>URL:</strong> <a href="{{ image[5] }}" target="_blank">{{ image[5] }}</a></p>
+                        {% endif %}
                     </div>
                 </div>
-            {% endfor %}
-        </div>
-<a href="{{ url_for('list_persons') }}" class="btn btn-secondary mt-4">Back to Persons List</a>
+            </div>
+        {% endfor %}
+    </div>
+
+    <a href="{{ url_for('list_persons') }}" class="btn btn-secondary mt-4">Back to Persons List</a>
 {% endblock %}

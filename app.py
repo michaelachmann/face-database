@@ -68,7 +68,7 @@ def upload_image():
                 # Convert the uploaded file to JPEG in memory
                 converted_image = convert_image(file, format='JPEG')
                 image_data = converted_image.getvalue()  # Get the bytes data
-                origin = 'local'
+                origin = 'file'
                 flash('Image uploaded successfully from disk!', 'success')
             else:
                 flash('Invalid file type. Please upload a valid image file.', 'error')
@@ -144,14 +144,113 @@ def list_persons():
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # Get all persons with their face image paths
-    cur.execute("SELECT id, face_image_path FROM persons ORDER BY id ASC;")
+    # Get filter parameters
+    min_images = request.args.get('min_images', default=0, type=int)
+    max_age = request.args.get('max_age', default=None, type=float)
+    name_filter = request.args.get('name', default=None, type=str)
+
+    # Get pagination and sorting parameters
+    page = request.args.get('page', default=1, type=int)
+    per_page = request.args.get('per_page', default=12, type=int)
+    sort_by = request.args.get('sort_by', default='id', type=str)
+    sort_order = request.args.get('sort_order', default='asc', type=str)
+
+    # Start building the SQL query
+    query = '''
+        SELECT p.id, p.face_image_path, p.name, COUNT(fe.image_id) as image_count, 
+               AVG(fe.age) as mean_age
+        FROM persons p
+        LEFT JOIN face_embeddings fe ON p.id = fe.person_id
+    '''
+
+    # Initialize the WHERE clause
+    conditions = []
+    if name_filter:
+        conditions.append('p.name ILIKE %s')
+
+    # Add the conditions to the query
+    if conditions:
+        query += ' WHERE ' + ' AND '.join(conditions)
+
+    # Add the GROUP BY clause
+    query += ' GROUP BY p.id, p.face_image_path, p.name'
+
+    # Add the HAVING clause for aggregate filters
+    having_conditions = []
+    if min_images > 0:
+        having_conditions.append('COUNT(fe.image_id) >= %s')
+    if max_age is not None:
+        having_conditions.append('AVG(fe.age) <= %s')
+
+    if having_conditions:
+        query += ' HAVING ' + ' AND '.join(having_conditions)
+
+    # Add the ORDER BY clause
+    query += f' ORDER BY {sort_by} {sort_order}'
+
+    # Add LIMIT and OFFSET for pagination
+    query += ' LIMIT %s OFFSET %s'
+
+    # Prepare the parameters for the query
+    params = []
+    if name_filter:
+        params.append(f'%{name_filter}%')
+    if min_images > 0:
+        params.append(min_images)
+    if max_age is not None:
+        params.append(max_age)
+
+    params.extend([per_page, (page - 1) * per_page])
+
+    cur.execute(query, tuple(params))
     persons = cur.fetchall()
+
+    # Get the total number of records for pagination
+    cur.execute('''
+        SELECT COUNT(DISTINCT p.id)
+        FROM persons p
+        LEFT JOIN face_embeddings fe ON p.id = fe.person_id
+    ''')
+    total_persons = cur.fetchone()[0]
 
     cur.close()
     conn.close()
 
-    return render_template('persons.html', persons=persons)
+    # Calculate total pages
+    total_pages = (total_persons + per_page - 1) // per_page
+
+    return render_template('persons.html', persons=persons, page=page, per_page=per_page, total_pages=total_pages,
+                           sort_by=sort_by, sort_order=sort_order)
+
+
+@app.route('/persons/<int:person_id>/edit', methods=['GET', 'POST'])
+def edit_person(person_id):
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    if request.method == 'POST':
+        name = request.form['name']
+        cur.execute('''
+            UPDATE persons 
+            SET name = %s 
+            WHERE id = %s
+        ''', (name, person_id))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return redirect(url_for('list_persons'))
+
+    cur.execute('''
+        SELECT id, name 
+        FROM persons 
+        WHERE id = %s
+    ''', (person_id,))
+    person = cur.fetchone()
+
+    cur.close()
+    conn.close()
+
+    return render_template('edit_person.html', person=person)
 
 
 # Route for displaying all images associated with a person
@@ -160,24 +259,39 @@ def show_person(person_id):
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # Get all images and the cropped face image path where this person appears
-    cur.execute("""
-        SELECT i.image_path, f.face_position, p.face_image_path
+    # Get person details including name, mean age, and image count
+    cur.execute('''
+        SELECT p.name, AVG(fe.age) as mean_age, COUNT(fe.image_id) as image_count
+        FROM persons p
+        LEFT JOIN face_embeddings fe ON p.id = fe.person_id
+        WHERE p.id = %s
+        GROUP BY p.id;
+    ''', (person_id,))
+    person_details = cur.fetchone()
+
+    # Get all images and metadata where this person appears
+    cur.execute('''
+        SELECT i.image_path, f.face_position, p.face_image_path, i.upload_time, i.origin, i.url
         FROM images i 
         JOIN face_embeddings f ON i.id = f.image_id 
         JOIN persons p ON f.person_id = p.id
         WHERE f.person_id = %s
         ORDER BY i.upload_time DESC;
-    """, (person_id,))
+    ''', (person_id,))
     images = cur.fetchall()
 
     cur.close()
     conn.close()
 
-    return render_template('person.html', person_id=person_id, images=images)
+    return render_template('person.html', person_id=person_id, person_details=person_details, images=images)
 
 
-# Route for displaying details of a specific image and face
+
+import os
+import ast
+from PIL import Image, ImageDraw
+from flask import render_template, url_for
+
 @app.route('/person/<int:person_id>/image/<path:image_path>', methods=['GET'])
 def show_image(person_id, image_path):
     conn = get_db_connection()
@@ -185,18 +299,32 @@ def show_image(person_id, image_path):
 
     # Get the face and metadata in this image for the given person_id
     cur.execute("""
-        SELECT f.person_id, f.age, f.gender, f.race, f.emotion, f.face_position, f.distance, i.origin, i.url
+        SELECT f.person_id, f.age, f.gender, f.race, f.emotion, f.face_position, f.distance, i.origin, i.url, f.embedding
         FROM images i 
         JOIN face_embeddings f ON i.id = f.image_id 
         WHERE i.image_path = %s AND f.person_id = %s;
     """, (image_path, person_id))
     face = cur.fetchone()  # Expecting only one face
 
+    if face is None:
+        cur.close()
+        conn.close()
+        return "No face found for this person in the given image.", 404
+
+    embedding = face[9]  # The embedding vector
+
+    cur.execute("""
+        SELECT i.image_path, f.person_id, (f.embedding <-> %s) AS calculated_distance
+        FROM face_embeddings f
+        JOIN images i ON f.image_id = i.id
+        WHERE i.image_path != %s
+        ORDER BY calculated_distance ASC
+        LIMIT 4;
+    """, (embedding, image_path))
+
+    similar_faces = cur.fetchall()
     cur.close()
     conn.close()
-
-    if face is None:
-        return "No face found for this person in the given image.", 404
 
     # Draw bounding box on the image
     image_full_path = os.path.join(app.config['UPLOAD_FOLDER'], image_path)
@@ -216,7 +344,7 @@ def show_image(person_id, image_path):
         print(f"Drawing rectangle from ({x0}, {y0}) to ({x1}, {y1})")
 
         # Draw the rectangle
-        draw.rectangle([x0, y0, x1, y1], outline="red", width=15)
+        draw.rectangle([x0, y0, x1, y1], outline="red", width=5)
 
     processed_image_path = os.path.join(app.config['UPLOAD_FOLDER'], f"processed_{os.path.basename(image_path)}")
     image.save(processed_image_path)
@@ -230,13 +358,21 @@ def show_image(person_id, image_path):
         "race": face[3],
         "emotion": face[4],
         "bbox": face[5],
-        "distance": face[6],  # Add the distance value here
+        "distance": face[6],
         "origin": face[7],
         "url": face[8],
     }
 
-    # Render the template with the image, face metadata, and additional info
-    return render_template('image.html', image_info=image_info)
+    # Prepare the list of similar faces
+    similar_faces_data = [{
+        "image_path": f[0],
+        "person_id": f[1],
+        "distance": f[2]  # This is the calculated distance
+    } for f in similar_faces]
+
+    # Render the template with the image, face metadata, and similar faces
+    return render_template('image.html', image_info=image_info, similar_faces=similar_faces_data)
+
 
 
 # Route for displaying clusters
@@ -245,32 +381,137 @@ def list_clusters():
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # Get all clusters and their associated faces
+    # Query to fetch all images, grouped by cluster, and retrieve the age connected to each image
     cur.execute("""
-        SELECT f.cluster_id, p.id as person_id, p.face_image_path, i.image_path 
+        SELECT f.cluster_id, p.id as person_id, p.name, p.face_image_path, 
+               i.image_path, i.upload_time, i.origin, i.url,
+               f.age, COUNT(fe2.image_id) as image_count
         FROM face_embeddings f 
         JOIN persons p ON f.person_id = p.id
         JOIN images i ON f.image_id = i.id
-        WHERE f.cluster_id IS NOT NULL 
-        ORDER BY f.cluster_id, p.id ASC;
+        LEFT JOIN face_embeddings fe2 ON p.id = fe2.person_id
+        WHERE f.cluster_id IS NOT NULL
+        GROUP BY f.cluster_id, p.id, p.face_image_path, i.image_path, i.upload_time, i.origin, i.url, f.age
+        ORDER BY f.cluster_id, p.id ASC
     """)
     clusters = cur.fetchall()
 
     cur.close()
     conn.close()
 
-    # Group faces by cluster ID
+    # Group faces by cluster ID, limit to 5 images per cluster in overview
     clusters_dict = {}
-    for cluster_id, person_id, face_image_path, image_path in clusters:
+    cluster_image_counts = {}  # To store the number of images per cluster
+
+    for cluster_id, person_id, name, face_image_path, image_path, upload_time, origin, url, age, image_count in clusters:
         if cluster_id not in clusters_dict:
             clusters_dict[cluster_id] = []
-        clusters_dict[cluster_id].append({
+            cluster_image_counts[cluster_id] = 0  # Initialize count
+
+        if len(clusters_dict[cluster_id]) < 4:
+            clusters_dict[cluster_id].append({
+                'person_id': person_id,
+                'name': name,
+                'face_image_path': face_image_path,
+                'image_path': image_path,
+                'upload_time': upload_time,
+                'origin': origin,
+                'url': url,
+                'age': age,
+                'image_count': image_count
+            })
+
+        cluster_image_counts[cluster_id] += 1  # Increment the count
+
+    return render_template('clusters_overview.html', clusters=clusters_dict, cluster_image_counts=cluster_image_counts)
+
+
+@app.route('/clusters/<int:cluster_id>', methods=['GET'])
+def show_cluster(cluster_id):
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    # Query to fetch all images in a specific cluster
+    cur.execute("""
+        SELECT f.cluster_id, p.id as person_id, p.name, p.face_image_path, 
+               i.image_path, i.upload_time, i.origin, i.url,
+               COUNT(fe2.image_id) as image_count, AVG(fe2.age) as mean_age
+        FROM face_embeddings f 
+        JOIN persons p ON f.person_id = p.id
+        JOIN images i ON f.image_id = i.id
+        LEFT JOIN face_embeddings fe2 ON p.id = fe2.person_id
+        WHERE f.cluster_id = %s
+        GROUP BY f.cluster_id, p.id, p.face_image_path, i.image_path, i.upload_time, i.origin, i.url
+        ORDER BY p.id ASC
+    """, (cluster_id,))
+    images = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    # Group faces by cluster ID
+    cluster_data = {
+        'cluster_id': cluster_id,
+        'images': []
+    }
+
+    for cluster_id, person_id, name, face_image_path, image_path, upload_time, origin, url, image_count, mean_age in images:
+        cluster_data['images'].append({
             'person_id': person_id,
+            'name': name,
             'face_image_path': face_image_path,
-            'image_path': image_path
+            'image_path': image_path,
+            'upload_time': upload_time,
+            'origin': origin,
+            'url': url,
+            'image_count': image_count,
+            'mean_age': mean_age
         })
 
-    return render_template('clusters.html', clusters=clusters_dict)
+    return render_template('cluster_details.html', cluster=cluster_data)
+
+@app.route('/analysis/overlap', methods=['GET'])
+def analyze_overlap():
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    # Query to fetch one sample image per cluster and one sample image per person within that cluster
+    cur.execute("""
+        SELECT 
+            f.person_id, 
+            f.cluster_id, 
+            MIN(i.image_path) as person_image, 
+            (SELECT MIN(i2.image_path) 
+             FROM face_embeddings f2 
+             JOIN images i2 ON f2.image_id = i2.id 
+             WHERE f2.cluster_id = f.cluster_id 
+             AND f2.cluster_id IS NOT NULL AND f2.cluster_id != -1) as cluster_image, 
+            COUNT(*) as count
+        FROM face_embeddings f
+        JOIN images i ON f.image_id = i.id
+        WHERE f.cluster_id IS NOT NULL AND f.cluster_id != -1
+        GROUP BY f.person_id, f.cluster_id
+        ORDER BY count DESC;
+    """)
+
+    overlap_data = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    # Structure the data for analysis
+    overlap_dict = {}
+    for person_id, cluster_id, person_image, cluster_image, count in overlap_data:
+        if person_id not in overlap_dict:
+            overlap_dict[person_id] = {}
+        overlap_dict[person_id][cluster_id] = {
+            'count': count,
+            'person_image': person_image,
+            'cluster_image': cluster_image
+        }
+
+    return render_template('analysis_overlap.html', overlap_dict=overlap_dict)
+
 
 
 if __name__ == "__main__":

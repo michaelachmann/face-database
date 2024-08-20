@@ -3,23 +3,85 @@
 {% block title %}Persons List{% endblock %}
 
 {% block content %}
-        <h1 class="mb-4">Persons</h1>
-        <div class="row">
-            {% for person in persons %}
-                <div class="col-sm-6 col-md-4 col-lg-3 mb-4">
-                    <div class="card">
-                        <a href="{{ url_for('show_person', person_id=person[0]) }}">
-                            <img src="{{ url_for('face_images', filename=person[1]) if person[1] else url_for('static', filename='default_face.png') }}"
-                                 class="card-img-top img-fluid"
-                                 alt="Face Image" style="object-fit: cover; height: 400px; width: 100%;">
-                            </a>
-                        <div class="card-body">
-                            <h5 class="card-title">Person ID: {{ person[0] }}</h5>
-                            <a href="{{ url_for('show_person', person_id=person[0]) }}" class="btn btn-primary">View Details</a>
-                        </div>
+    <h1 class="mb-4">Persons</h1>
+
+    <!-- Filter Form -->
+    <form method="GET" action="{{ url_for('list_persons') }}" class="mb-4">
+        <div class="form-row">
+            <div class="col">
+                <label for="min_images">Minimum Images</label>
+                <input type="number" class="form-control" id="min_images" name="min_images" value="{{ request.args.get('min_images', '') }}">
+            </div>
+            <div class="col">
+                <label for="max_age">Maximum Mean Age</label>
+                <input type="number" step="0.1" class="form-control" id="max_age" name="max_age" value="{{ request.args.get('max_age', '') }}">
+            </div>
+            <div class="col">
+                <label for="name">Name Contains</label>
+                <input type="text" class="form-control" id="name" name="name" value="{{ request.args.get('name', '') }}">
+            </div>
+        </div>
+        <div class="form-row mt-3">
+            <div class="col">
+                <label for="sort_by">Sort By</label>
+                <select class="form-control" id="sort_by" name="sort_by">
+                    <option value="id" {% if sort_by == 'id' %}selected{% endif %}>ID</option>
+                    <option value="name" {% if sort_by == 'name' %}selected{% endif %}>Name</option>
+                    <option value="image_count" {% if sort_by == 'image_count' %}selected{% endif %}>Image Count</option>
+                    <option value="mean_age" {% if sort_by == 'mean_age' %}selected{% endif %}>Mean Age</option>
+                </select>
+            </div>
+            <div class="col">
+                <label for="sort_order">Sort Order</label>
+                <select class="form-control" id="sort_order" name="sort_order">
+                    <option value="asc" {% if sort_order == 'asc' %}selected{% endif %}>Ascending</option>
+                    <option value="desc" {% if sort_order == 'desc' %}selected{% endif %}>Descending</option>
+                </select>
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary mt-3">Filter & Sort</button>
+        <a href="{{ url_for('list_persons') }}" class="btn btn-secondary mt-3">Clear Filters</a>
+    </form>
+
+    <!-- Persons List -->
+    <div class="row">
+        {% for person in persons %}
+            <div class="col-sm-6 col-md-4 col-lg-3 mb-4">
+                <div class="card">
+                    <a href="{{ url_for('show_person', person_id=person[0]) }}">
+                        <img src="{{ url_for('face_images', filename=person[1]) if person[1] else url_for('static', filename='default_face.png') }}"
+                             class="card-img-top img-fluid"
+                             alt="Face Image" style="object-fit: cover; height: 400px; width: 100%;">
+                    </a>
+                    <div class="card-body">
+                        <h5 class="card-title">{{ person[2] if person[2] else 'Person ID: ' + person[0]|string }}</h5>
+                        <p class="card-text">Image Count: {{ person[3] }}</p>
+                        <p class="card-text">Mean Age: {{ person[4]|round(1) if person[4] else 'N/A' }}</p>
+                        <a href="{{ url_for('show_person', person_id=person[0]) }}" class="btn btn-primary">View Details</a>
                     </div>
                 </div>
-            {% endfor %}
-        </div>
-{% endblock %}
+            </div>
+        {% endfor %}
+    </div>
 
+    <!-- Pagination -->
+    <nav aria-label="Page navigation" class="mt-4">
+        <ul class="pagination">
+            {% if page > 1 %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('list_persons', page=page-1, per_page=per_page, sort_by=sort_by, sort_order=sort_order, min_images=request.args.get('min_images', ''), max_age=request.args.get('max_age', ''), name=request.args.get('name', '')) }}">Previous</a>
+                </li>
+            {% endif %}
+            {% for p in range(1, total_pages + 1) %}
+                <li class="page-item {% if p == page %}active{% endif %}">
+                    <a class="page-link" href="{{ url_for('list_persons', page=p, per_page=per_page, sort_by=sort_by, sort_order=sort_order, min_images=request.args.get('min_images', ''), max_age=request.args.get('max_age', ''), name=request.args.get('name', '')) }}">{{ p }}</a>
+                </li>
+            {% endfor %}
+            {% if page < total_pages %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('list_persons', page=page+1, per_page=per_page, sort_by=sort_by, sort_order=sort_order, min_images=request.args.get('min_images', ''), max_age=request.args.get('max_age', ''), name=request.args.get('name', '')) }}">Next</a>
+                </li>
+            {% endif %}
+        </ul>
+    </nav>
+{% endblock %}

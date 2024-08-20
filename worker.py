@@ -32,7 +32,7 @@ def perform_clustering():
     cur.execute("SELECT id, embedding FROM face_embeddings;")
     embeddings_data = cur.fetchall()
 
-    if len(embeddings_data) < 2:
+    if len(embeddings_data) < 4:
         print("Not enough data to perform clustering.")
         cur.close()
         conn.close()
@@ -43,7 +43,7 @@ def perform_clustering():
     embeddings = np.array([np.fromstring(row[1][1:-1], sep=',') for row in embeddings_data])
 
     # Perform HDBSCAN clustering
-    clusterer = hdbscan.HDBSCAN(min_cluster_size=2, min_samples=1, metric='euclidean', cluster_selection_method='leaf')
+    clusterer = hdbscan.HDBSCAN(min_cluster_size=4, min_samples=1, metric='euclidean', cluster_selection_method='eom')
     cluster_labels = clusterer.fit_predict(embeddings)
 
     # Update the cluster labels in the database

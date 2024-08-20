@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block title %}Person-Cluster Overlap Analysis{% endblock %}
+
+{% block content %}
+    <h1 class="mb-4">Person-Cluster Overlap Analysis</h1>
+
+    <div class="container">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Person ID</th>
+                    <th>Cluster ID</th>
+                    <th>Count</th>
+                    <th>Person Sample Image</th>
+                    <th>Cluster Sample Image</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for person_id, clusters in overlap_dict.items() %}
+                    {% for cluster_id, data in clusters.items() %}
+                    <tr>
+                        <td><a href="{{ url_for('show_person', person_id=person_id) }}" class="btn btn-primary">View Person {{person_id }}</a></td>
+                        <td><a href="{{ url_for('show_cluster', cluster_id=cluster_id) }}"  class="btn btn-secondary">View Cluster {{ cluster_id }}</a></td>
+                        <td>{{ data.count }}</td>
+                        <td>
+                            <a href="{{ url_for('show_image', person_id=person_id, image_path=data.person_image) }}">
+                                <img src="{{ url_for('uploaded_file', filename=data.person_image) }}"
+                                     alt="Person Sample Image" style="width: 100px; height: auto;">
+                            </a>
+                        </td>
+                        <td>
+                            <a href="{{ url_for('show_image', person_id=person_id, image_path=data.cluster_image) }}">
+                                <img src="{{ url_for('uploaded_file', filename=data.cluster_image) }}"
+                                     alt="Cluster Sample Image" style="width: 100px; height: auto;">
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Heatmap Visualization -->
+    <h2 class="mt-5">Overlap Heatmap</h2>
+    <div class="chart-container">
+        <canvas id="overlapHeatmap"></canvas>
+    </div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    var ctx = document.getElementById('overlapHeatmap').getContext('2d');
+
+    var labelsX = [{% for person_id in overlap_dict.keys() %} '{{ person_id }}', {% endfor %}];
+    var labelsY = [];
+    {% for clusters in overlap_dict.values() %}
+        {% for cluster_id in clusters.keys() %}
+            if (!labelsY.includes('{{ cluster_id }}')) {
+                labelsY.push('{{ cluster_id }}');
+            }
+        {% endfor %}
+    {% endfor %}
+
+    var data = {
+        labels: labelsY,
+        datasets: [{
+            label: 'Overlap',
+            data: [
+                {% for person_id, clusters in overlap_dict.items() %}
+                    {% for cluster_id, data in clusters.items() %}
+                        { x: labelsX.indexOf('{{ person_id }}'), y: labelsY.indexOf('{{ cluster_id }}'), r: {{ data.count }} * 2 },
+                    {% endfor %}
+                {% endfor %}
+            ],
+            backgroundColor: 'rgba(75, 192, 192, 0.5)'
+        }]
+    };
+
+    var heatmapChart = new Chart(ctx, {
+        type: 'bubble',
+        data: data,
+        options: {
+            scales: {
+                x: {
+                    type: 'category',
+                    labels: labelsX
+                },
+                y: {
+                    type: 'category',
+                    labels: labelsY
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            elements: {
+                point: {
+                    backgroundColor: function(context) {
+                        var value = context.raw.r / 2; // Adjust the size scaling factor as needed
+                        var alpha = value / Math.max(...data.datasets[0].data.map(d => d.r));
+                        return `rgba(75, 192, 192, ${alpha})`;
+                    }
+                }
+            }
+        }
+    });
+</script>
+
+{% endblock %}

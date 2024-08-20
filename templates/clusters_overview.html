@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}Face Clusters Overview{% endblock %}
+
+{% block content %}
+    <h1 class="mb-4">Face Clusters Overview</h1>
+
+ <!-- Chart Section -->
+    <h2 class="mt-5">Cluster Image Distribution</h2>
+    <div class="chart-container">
+        <canvas id="clusterChart"></canvas>
+    </div>
+
+    <div class="container">
+
+        {% for cluster_id, faces in clusters.items() %}
+        <div class="cluster mb-5">
+            <h2 class="mb-3">Cluster {{ cluster_id }} ({{ cluster_image_counts[cluster_id] }} Images)</h2>
+            <div class="row">
+                {% for face_image in faces %}
+                <div class="col-sm-6 col-md-4 col-lg-3 mb-4">
+                    <div class="card">
+                        <a href="{{ url_for('show_image', person_id=face_image['person_id'], image_path=face_image['image_path']) }}">
+                        <img src="{{ url_for('uploaded_file', filename=face_image['image_path']) }}"
+                             class="card-img-top img-fluid"
+                             alt="Face Image" style="object-fit: cover; height: 300px; width: 100%;">
+                        </a>
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                {{ face_image['image_path'] }}
+                            </h5>
+                            <p class="card-text">
+                                <a href="{{ url_for('show_person', person_id=face_image['person_id']) }}">
+                                    {{ face_image['name'] if face_image['name'] else 'Person ID: ' + face_image['person_id']|string }}
+                                </a>
+                            </p>
+                            <p class="card-text">Age: {{ face_image['age'] }}</p>
+                            {% if face_image['url'] %}
+                                <p class="card-text"><a href="{{ face_image['url'] }}" target="_blank">Source Link</a></p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <a href="{{ url_for('show_cluster', cluster_id=cluster_id) }}" class="btn btn-primary">View All Images in Cluster {{ cluster_id }}</a>
+        </div>
+        {% endfor %}
+    </div>
+
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        var ctx = document.getElementById('clusterChart').getContext('2d');
+        var clusterChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: [{% for cluster_id in cluster_image_counts.keys() %}'Cluster {{ cluster_id }}',{% endfor %}],
+                datasets: [{
+                    label: '# of Images',
+                    data: [{% for count in cluster_image_counts.values() %}{{ count }},{% endfor %}],
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    </script>
+{% endblock %}
