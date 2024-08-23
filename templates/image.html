@@ -2,46 +2,65 @@
 
 {% block title %}Image Details{% endblock %}
 
+{% block container_class %}container-fluid{% endblock %}
+
 {% block content %}
-<div class="container mt-4">
-    <h1 class="mb-4">Image Details</h1>
+<div class="mt-4 mx-3">
+    <!-- Breadcrumb Navigation -->
+    <nav aria-label="breadcrumb" class="mx-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('show_person', person_id=image_info['person_id']) }}">Person {{ image_info['person_id'] }}</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ image_info['image_uuid'] }}</li>
+        </ol>
+    </nav>
 
-    <!-- Display the processed image -->
-    <div class="text-center mb-4">
-        <img src="{{ url_for('uploaded_file', filename=image_info['image_path']) }}" class="img-fluid rounded" style="max-width: 100%;" alt="Processed Image">
-    </div>
+    <!-- Display the image and metadata side by side -->
+    <div class="row">
+        <!-- Image section -->
+        <div class="col-md-9">
+            <div class="text-center mb-4">
+                <img src="{{ url_for('uploaded_file', filename=image_info['image_path']) }}"
+                     class="img-fluid rounded"
+                     style="max-width: 100%; height: auto; max-height: 80vh;"
+                     alt="Processed Image">
+            </div>
+        </div>
 
-    <!-- Display the face metadata -->
-    <div class="card">
-        <div class="card-body">
-            <h5 class="card-title">Face Metadata</h5>
-            <ul class="list-group list-group-flush">
-                <li class="list-group-item"><a href="{{ url_for('show_person', person_id=image_info['person_id']) }}" class="mt-auto btn btn-info">Person {{ image_info['person_id'] }}</a></li>
-                <li class="list-group-item"><strong>Distance:</strong> {{ image_info['distance'] }}</li>
-                <li class="list-group-item"><strong>Age:</strong> {{ image_info['age'] }}</li>
-                <li class="list-group-item"><strong>Gender:</strong> {{ image_info['gender'] }}</li>
-                <li class="list-group-item"><strong>Race:</strong> {{ image_info['race'] }}</li>
-                <li class="list-group-item"><strong>Emotion:</strong> {{ image_info['emotion'] }}</li>
-                <li class="list-group-item"><strong>Bounding Box:</strong> {{ image_info['bbox'] }}</li>
-                <li class="list-group-item"><strong>Source:</strong> {{ image_info['origin'] }}</li>
-                {% if image_info['url'] %}
-                <li class="list-group-item"><strong>URL:</strong> <a href="{{ image_info['url'] }}">{{ image_info['url'] }}</a></li>
-                {% else %}
-                <li class="list-group-item"><strong>URL:</strong> Not available</li>
-                {% endif %}
-            </ul>
+        <!-- Metadata section -->
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Face Metadata</h5>
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item"><a href="{{ url_for('show_person', person_id=image_info['person_id']) }}" class="mt-auto btn btn-secondary">Person {{ image_info['person_id'] }}</a></li>
+                        <li class="list-group-item"><strong>Distance:</strong> {{ image_info['distance'] }}</li>
+                        <li class="list-group-item"><strong>Age:</strong> {{ image_info['age'] }}</li>
+                        <li class="list-group-item"><strong>Gender:</strong> {{ image_info['gender'] }}</li>
+                        <li class="list-group-item"><strong>Race:</strong> {{ image_info['race'] }}</li>
+                        <li class="list-group-item"><strong>Emotion:</strong> {{ image_info['emotion'] }}</li>
+                        <li class="list-group-item"><strong>Bounding Box:</strong> {{ image_info['bbox'] }}</li>
+                        <li class="list-group-item"><strong>Source:</strong> {{ image_info['origin'] }}</li>
+                        {% if image_info['url'] %}
+                        <li class="list-group-item"><strong>URL:</strong> <a href="{{ image_info['url'] }}">{{ image_info['url'] }}</a></li>
+                        {% else %}
+                        <li class="list-group-item"><strong>URL:</strong> Not available</li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
         </div>
     </div>
 
     <!-- Display similar faces -->
-    <div class="mt-4">
+    <div class="container mt-4">
+        <hr />
         <h4>Similar Faces</h4>
-        <div class="row">
+        <div class="row mt-3">
             {% for face in similar_faces %}
             <div class="col-sm-6 col-md-4 col-lg-3 mb-4">
                 <div class="card h-100">
                     <a href="{{ url_for('show_image', person_id=face['person_id'], image_path=face['image_path']) }}">
-                        <img src="{{ url_for('uploaded_file', filename=face['image_path']) }}" class="card-img-top img-fluid" style="object-fit: cover; height: 200px; width: 100%;" alt="Similar Face">
+                        <img src="{{ url_for('uploaded_file', filename=face['image_path']) }}" class="card-img-top img-fluid" style="object-fit: cover; height: 300px; width: 100%;" alt="Similar Face">
                     </a>
                     <div class="card-body d-flex flex-column">
                         <p class="card-text"><strong>Distance:</strong> {{ face['distance'] }}</p>
@@ -54,9 +73,6 @@
         </div>
     </div>
 
-    <!-- Link back to the person details -->
-    <div class="mt-4">
-        <a href="{{ url_for('show_person', person_id=image_info['person_id']) }}" class="btn btn-secondary">Back to Person</a>
-    </div>
+
 </div>
 {% endblock %}

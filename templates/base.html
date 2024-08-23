@@ -1,4 +1,5 @@
 <!-- templates/base.html -->
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -71,10 +72,11 @@
             {% endwith %}
         </div>
 
-        <!-- Main Content -->
-        <div class="container mt-4 content">
-            {% block content %}{% endblock %}
-        </div>
+    <!-- Main Content -->
+    <div class="{% block container_class %}container{% endblock %} mt-4 content">
+        {% block content %}{% endblock %}
+    </div>
+
 
         <!-- Footer -->
         <footer class="footer mt-auto py-3 bg-light">

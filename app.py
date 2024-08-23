@@ -11,6 +11,7 @@ from PIL import Image, ImageDraw
 import ast
 import base64
 
+
 app = Flask(__name__)
 app.config.from_object(config)
 
@@ -134,6 +135,7 @@ def upload_image():
             flash(f"Image successfully uploaded and queued for processing (key: {image_key})", 'success')
 
         return redirect(url_for('upload_image'))
+
 
     return render_template('upload.html')
 
@@ -271,7 +273,7 @@ def show_person(person_id):
 
     # Get all images and metadata where this person appears
     cur.execute('''
-        SELECT i.image_path, f.face_position, p.face_image_path, i.upload_time, i.origin, i.url
+        SELECT i.image_path, f.face_position, p.face_image_path, i.upload_time, i.origin, i.url, f.id
         FROM images i 
         JOIN face_embeddings f ON i.id = f.image_id 
         JOIN persons p ON f.person_id = p.id
@@ -285,12 +287,6 @@ def show_person(person_id):
 
     return render_template('person.html', person_id=person_id, person_details=person_details, images=images)
 
-
-
-import os
-import ast
-from PIL import Image, ImageDraw
-from flask import render_template, url_for
 
 @app.route('/person/<int:person_id>/image/<path:image_path>', methods=['GET'])
 def show_image(person_id, image_path):
@@ -361,6 +357,7 @@ def show_image(person_id, image_path):
         "distance": face[6],
         "origin": face[7],
         "url": face[8],
+        "image_uuid": image_path
     }
 
     # Prepare the list of similar faces
@@ -540,7 +537,7 @@ def list_images():
 
     # Build the base query
     query = """
-        SELECT i.image_path, f.person_id, f.age, f.gender, f.race, f.emotion, i.upload_time, f.distance, f.cluster_id
+        SELECT i.image_path, f.person_id, f.age, f.gender, f.race, f.emotion, i.upload_time, f.distance, f.cluster_id, i.id
         FROM images i
         JOIN face_embeddings f ON i.id = f.image_id
         WHERE 1=1
@@ -606,6 +603,124 @@ def list_images():
                            max=max,
                            min=min,
                            race_categories=race_categories)
+
+@app.route('/image/<int:image_id>/delete', methods=['POST'])
+def delete_image(image_id):
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    # Retrieve the image path
+    cur.execute('SELECT image_path FROM images WHERE id = %s', (image_id,))
+    image_record = cur.fetchone()
+    if not image_record:
+        flash('Image not found.', 'error')
+        return redirect(url_for('list_images'))
+
+    image_path = image_record[0]
+
+    # Delete the image file from the filesystem
+    try:
+        os.remove(os.path.join(app.config['UPLOAD_FOLDER'], image_path))
+    except FileNotFoundError:
+        flash('Image file not found on the server.', 'warning')
+
+    # Delete face embeddings associated with this image
+    cur.execute('DELETE FROM face_embeddings WHERE image_id = %s', (image_id,))
+
+    # Delete the image record from the database
+    cur.execute('DELETE FROM images WHERE id = %s', (image_id,))
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    flash('Image and associated embeddings deleted successfully.', 'success')
+    return redirect(url_for('list_images'))
+
+@app.route('/persons/merge', methods=['POST'])
+def merge_persons():
+    person_ids = request.form.getlist('person_ids')  # List of person IDs to merge
+    target_person_id = request.form['target_person_id']  # ID of the person to keep
+
+    if not person_ids or not target_person_id:
+        flash('Please select persons to merge and a target person.', 'error')
+        return redirect(url_for('list_persons'))
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    # Convert person_ids to a list of integers
+    person_ids = list(map(int, person_ids))
+
+    # Update the face_embeddings to point to the target person
+    cur.execute('''
+        UPDATE face_embeddings
+        SET person_id = %s
+        WHERE person_id = ANY(%s) AND person_id != %s
+    ''', (target_person_id, person_ids, target_person_id))
+
+    # Optionally, delete the merged persons from the persons table
+    cur.execute('''
+        DELETE FROM persons WHERE id = ANY(%s) AND id != %s
+    ''', (person_ids, target_person_id))
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    flash('Persons merged successfully.', 'success')
+    return redirect(url_for('list_persons'))
+
+
+
+@app.route('/face_embedding/<int:embedding_id>/reassign', methods=['GET'])
+def reassign_face_embedding_view(embedding_id):
+    # Fetch all persons to populate the dropdown
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    cur.execute('''
+        SELECT id, name
+        FROM persons
+        ORDER BY name ASC;
+    ''')
+    persons = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    return render_template('reassign_face_embedding.html', embedding_id=embedding_id, persons=persons)
+
+@app.route('/face_embedding/<int:embedding_id>/reassign', methods=['POST'])
+def reassign_face_embedding(embedding_id):
+    new_person_id = request.form.get('new_person_id')
+    create_new_person = request.form.get('create_new_person', False)
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    if create_new_person:
+        # Create a new person and get the ID
+        cur.execute("INSERT INTO persons DEFAULT VALUES RETURNING id;")
+        new_person_id = cur.fetchone()[0]
+
+    if new_person_id:
+        # Update the face_embedding to point to the new person
+        cur.execute('''
+            UPDATE face_embeddings
+            SET person_id = %s
+            WHERE id = %s
+        ''', (new_person_id, embedding_id))
+
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        flash('Face embedding reassigned successfully.', 'success')
+        return redirect(url_for('list_persons'))
+
+    flash('Failed to reassign face embedding.', 'error')
+    return redirect(url_for('show_person', person_id=new_person_id))
 
 
 

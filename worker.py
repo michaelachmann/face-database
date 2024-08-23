@@ -71,6 +71,9 @@ def process_image(image_data, image_key, origin, image_url=None):
         image_data = base64.b64decode(image_data)
     image_md5 = calculate_md5(image_data)
 
+    # Generate a unique filename for the original image (if needed for future reference)
+    unique_filename = f"{uuid.uuid4()}.jpg"
+
     conn = get_db_connection()
     cur = conn.cursor()
 
@@ -111,6 +114,13 @@ def process_image(image_data, image_key, origin, image_url=None):
     if not embeddings:
         print("No faces detected in the image.")
         redis_client.delete(image_key)  # Clean up Redis
+
+        # Let's still insert the image to the DB to prevent future processing. We're not saving the actual image.
+        cur.execute(
+            "INSERT INTO images (image_path, origin, url, md5_hash) VALUES (%s, %s, %s, %s) RETURNING id;",
+            (unique_filename, origin, image_url, image_md5)
+        )
+
         cur.close()
         conn.close()
         return  # Exit the function without saving or creating any database entry
@@ -124,8 +134,6 @@ def process_image(image_data, image_key, origin, image_url=None):
         enforce_detection=False  # Do not raise an error if no faces are detected
     )
 
-    # Generate a unique filename for the original image (if needed for future reference)
-    unique_filename = f"{uuid.uuid4()}.jpg"
     image_path = os.path.join('uploads', unique_filename)
 
     # Save the original image to disk

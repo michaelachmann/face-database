@@ -4,3 +4,4 @@ psycopg2-binary
 redis
 tf-keras
 hdbscan
+python-dotenv

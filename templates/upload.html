@@ -1,10 +1,11 @@
-<!-- templates/upload.html -->
+<!-- upload.html -->
 {% extends "base.html" %}
 
 {% block title %}Upload Image{% endblock %}
 
 {% block content %}
 <h1>Upload Image</h1>
+
 <form action="{{ url_for('upload_image') }}" method="post" enctype="multipart/form-data">
     <div class="mb-3">
         <label for="image_file" class="form-label">Upload from Disk:</label>
