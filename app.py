@@ -60,47 +60,63 @@ def convert_image(image, format='JPEG'):
 def upload_image():
     if request.method == 'POST':
         origin = ''
-        image_data = None
-        image_key = f"image:{uuid.uuid4()}"
+        image_keys = []  # List to hold the keys of all uploaded images
 
-        if 'image_file' in request.files and request.files['image_file'].filename != '':
-            file = request.files['image_file']
-            if allowed_file(file.filename):
-                # Convert the uploaded file to JPEG in memory
-                converted_image = convert_image(file, format='JPEG')
-                image_data = converted_image.getvalue()  # Get the bytes data
-                origin = 'file'
-                flash('Image uploaded successfully from disk!', 'success')
-            else:
-                flash('Invalid file type. Please upload a valid image file.', 'error')
-                return redirect(url_for('upload_image'))
+        if 'image_file' in request.files:
+            files = request.files.getlist('image_file')  # Get a list of files
+            for file in files:
+                if file and file.filename != '' and allowed_file(file.filename):
+                    # Convert the uploaded file to JPEG in memory
+                    converted_image = convert_image(file, format='JPEG')
+                    image_data = converted_image.getvalue()  # Get the bytes data
+                    image_key = f"image:{uuid.uuid4()}"
+                    origin = 'file'
 
+                    # Save the image data to Redis
+                    redis_client.set(image_key, image_data)
+                    redis_client.rpush('image_queue', json.dumps({
+                        'image_key': image_key,
+                        'origin': origin,
+                        'image_url': None  # No URL for file uploads
+                    }))
+
+                    image_keys.append(image_key)
+                    flash(f'Image {file.filename} uploaded successfully from disk!', 'success')
+                else:
+                    flash(f'Invalid file type for {file.filename}. Please upload a valid image file.', 'error')
+
+        # Process the base64 image and URL fields as before
+        # (Optional: you can loop through these if you want to allow multiple base64 strings or URLs)
 
         elif 'image_base64' in request.form and request.form['image_base64'] != '':
             image_base64 = request.form['image_base64']
 
             try:
-                # Fix the padding if necessary
                 image_base64 = add_base64_padding(image_base64)
-
-                # Decode the base64 string and convert it to an image
                 image_data = base64.b64decode(image_base64)
                 img = Image.open(BytesIO(image_data))
 
                 if img.format.lower() in ALLOWED_EXTENSIONS:
-                    # Convert the image to JPEG in memory
                     converted_image = convert_image(BytesIO(image_data), format='JPEG')
                     image_data = converted_image.getvalue()  # Get the bytes data
                     origin = 'base64'
+                    image_key = f"image:{uuid.uuid4()}"
+
+                    # Save the image data to Redis
+                    redis_client.set(image_key, image_data)
+                    redis_client.rpush('image_queue', json.dumps({
+                        'image_key': image_key,
+                        'origin': origin,
+                        'image_url': None
+                    }))
+
+                    image_keys.append(image_key)
                     flash('Image uploaded successfully from base64 string!', 'success')
                 else:
                     flash('Invalid image format from base64 string. Please provide a valid image.', 'error')
-                    return redirect(url_for('upload_image'))
 
             except (base64.binascii.Error, IOError) as e:
                 flash(f'Failed to decode and process base64 image: {str(e)}', 'error')
-                return redirect(url_for('upload_image'))
-
 
         elif 'image_url' in request.form and request.form['image_url'] != '':
             image_url = request.form['image_url']
@@ -108,34 +124,30 @@ def upload_image():
             if response.status_code == 200:
                 img = Image.open(BytesIO(response.content))
                 if img.format.lower() in ALLOWED_EXTENSIONS:
-                    # Convert the image to JPEG in memory
                     converted_image = convert_image(BytesIO(response.content), format='JPEG')
                     image_data = converted_image.getvalue()  # Get the bytes data
                     origin = 'url'
+                    image_key = f"image:{uuid.uuid4()}"
+
+                    # Save the image data to Redis
+                    redis_client.set(image_key, image_data)
+                    redis_client.rpush('image_queue', json.dumps({
+                        'image_key': image_key,
+                        'origin': origin,
+                        'image_url': image_url  # Add URL if available
+                    }))
+
+                    image_keys.append(image_key)
                     flash('Image uploaded successfully from URL!', 'success')
                 else:
                     flash('Invalid image format from URL. Please provide a valid image URL.', 'error')
-                    return redirect(url_for('upload_image'))
             else:
                 flash('Failed to download image from URL. Please check the URL and try again.', 'error')
-                return redirect(url_for('upload_image'))
 
         else:
             flash('No image provided. Please upload an image, provide a URL, or a base64 string.', 'error')
-            return redirect(url_for('upload_image'))
-
-        # Save the image data to Redis
-        if image_data:
-            redis_client.set(image_key, image_data)
-            redis_client.rpush('image_queue', json.dumps({
-                'image_key': image_key,
-                'origin': origin,
-                'image_url': request.form.get('image_url', None)  # Add URL if available
-            }))
-            flash(f"Image successfully uploaded and queued for processing (key: {image_key})", 'success')
 
         return redirect(url_for('upload_image'))
-
 
     return render_template('upload.html')
 

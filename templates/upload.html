@@ -9,7 +9,7 @@
 <form action="{{ url_for('upload_image') }}" method="post" enctype="multipart/form-data">
     <div class="mb-3">
         <label for="image_file" class="form-label">Upload from Disk:</label>
-        <input type="file" id="image_file" name="image_file" class="form-control">
+        <input type="file" id="image_file" name="image_file" class="form-control" multiple>
     </div>
 
     <div class="mb-3">
