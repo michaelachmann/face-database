@@ -6,7 +6,9 @@ RUN apt-get update && apt-get install -y \
     gcc \
     build-essential \
     pkg-config \
-    libhdf5-dev
+    libhdf5-dev \
+    libgl1 \
+    libglib2.0-0
 
 # Set the working directory
 WORKDIR /app
@@ -24,4 +26,4 @@ COPY . .
 EXPOSE 8080
 
 # Run the Flask app
-CMD ["flask", "run", "--host=0.0.0.0"]
+CMD ["flask", "run", "--host=0.0.0.0", "--port=8080"]
