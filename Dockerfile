@@ -2,7 +2,7 @@
 ARG ENVIRONMENT=CPU
 
 # Stage 1: Base image for GPU-enabled systems
-FROM nvidia/cuda:11.8-cudnn8-runtime-ubuntu22.04 AS gpu
+FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04 AS gpu
 
 # Install gcc and other necessary build tools for GPU environment
 RUN apt-get update && apt-get install -y \
