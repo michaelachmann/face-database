@@ -2,7 +2,7 @@
 ARG ENVIRONMENT=CPU
 
 # Stage 1: Base image for GPU-enabled systems
-FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04 AS gpu
+FROM nvidia/cuda:11.8-cudnn8-runtime-ubuntu22.04 AS gpu
 
 # Install gcc and other necessary build tools for GPU environment
 RUN apt-get update && apt-get install -y \
@@ -28,7 +28,11 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Choose the final stage based on the ENVIRONMENT variable
-FROM ${ENVIRONMENT,,} AS final
+FROM cpu AS final
+ONBUILD ARG ENVIRONMENT
+
+# Conditionally switch to the GPU stage if ENVIRONMENT is GPU
+ONBUILD FROM ${ENVIRONMENT} AS final
 
 # Set the working directory
 WORKDIR /app

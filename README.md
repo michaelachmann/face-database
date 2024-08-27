@@ -36,12 +36,13 @@ This repository contains a Flask-based web application that allows users to uplo
 
     - For GPU-enabled systems:
         ```bash
-        export ENVIRONMENT=GPU
+        export ENVIRONMENT=gpu
         ```
+
 
     - For CPU-only systems (default, e.g., Mac M3):
         ```bash
-        export ENVIRONMENT=CPU
+        export ENVIRONMENT=cpu
         ```
 
 3. Build and start the application using Docker Compose:
