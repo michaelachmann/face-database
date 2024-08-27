@@ -20,7 +20,10 @@ services:
       - "6379:6379"
 
   web:
-    build: .
+    build:
+      context: .
+      args:
+        ENVIRONMENT: ${ENVIRONMENT:-CPU}
     command: bash -c "python db.py && python worker.py & flask run --host=0.0.0.0 --port=8080"
     environment:
       SECRET_KEY: "you-will-never-guess"
@@ -38,5 +41,5 @@ services:
 
 volumes:
   postgres_data:
-  uploads_data:  # Define the named volume for uploads
+  uploads_data:
   deepface_data:

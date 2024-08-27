@@ -32,12 +32,24 @@ This repository contains a Flask-based web application that allows users to uplo
     cd face-database
     ```
 
-2. Build and start the application using Docker Compose:
+2. Set the `ENVIRONMENT` variable depending on your environment:
+
+    - For GPU-enabled systems:
+        ```bash
+        export ENVIRONMENT=GPU
+        ```
+
+    - For CPU-only systems (default, e.g., Mac M3):
+        ```bash
+        export ENVIRONMENT=CPU
+        ```
+
+3. Build and start the application using Docker Compose:
     ```bash
     docker-compose up --build
     ```
 
-3. Access the application in your browser at `http://localhost:8080`.
+4. Access the application in your browser at `http://localhost:8080`.
 
 ## Usage
 
@@ -70,4 +82,4 @@ Contributions are welcome! Please open an issue or submit a pull request.
 
 ## Contact
 
-For any inquiries, please contact Michael Achmann-Denkler at [michael@achmann.me](mailto:michael@achmann.me).
+For any inquiries, please contact Michael Achmann-Denkler at [michael.achmann@informatik.uni-regensburg.de](mailto:michael.achmann@informatik.uni-regensburg.de).
