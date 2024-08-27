@@ -23,8 +23,8 @@ services:
     build:
       context: .
       args:
-        ENVIRONMENT: ${ENVIRONMENT:-CPU}
-    command: bash -c "python db.py && python worker.py & flask run --host=0.0.0.0 --port=8080"
+        ENVIRONMENT: ${ENVIRONMENT:-cpu}
+    command: bash -c "python3 db.py && python3 worker.py & flask run --host=0.0.0.0 --port=8080"
     environment:
       SECRET_KEY: "you-will-never-guess"
       SQLALCHEMY_DATABASE_URI: "postgresql://user:password@postgres:5432/face_recognition"

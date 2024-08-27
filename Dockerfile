@@ -2,7 +2,7 @@
 ARG ENVIRONMENT=cpu
 
 # Stage 1: Base image for GPU-enabled systems
-FROM nvidia/cuda:11.8-cudnn8-runtime-ubuntu22.04 AS gpu
+FROM nvidia/cuda:12.2.0-devel-ubuntu22.04 AS gpu
 
 # Stage 2: Base image for CPU-only systems
 FROM python:3.10-slim AS cpu
@@ -12,6 +12,7 @@ FROM ${ENVIRONMENT} AS final
 
 # Install gcc and other necessary build tools
 RUN apt-get update && apt-get install -y \
+    python3-pip \
     gcc \
     build-essential \
     pkg-config \
