@@ -1,23 +1,16 @@
-# Use the argument ENVIRONMENT to switch between GPU and CPU
-ARG ENVIRONMENT=CPU
+# ARG for environment selection
+ARG ENVIRONMENT=cpu
 
 # Stage 1: Base image for GPU-enabled systems
 FROM nvidia/cuda:11.8-cudnn8-runtime-ubuntu22.04 AS gpu
 
-# Install gcc and other necessary build tools for GPU environment
-RUN apt-get update && apt-get install -y \
-    gcc \
-    build-essential \
-    pkg-config \
-    libhdf5-dev \
-    libgl1 \
-    libglib2.0-0 \
-    && rm -rf /var/lib/apt/lists/*
-
 # Stage 2: Base image for CPU-only systems
 FROM python:3.10-slim AS cpu
 
-# Install gcc and other necessary build tools for CPU environment
+# Conditional final stage based on ENVIRONMENT argument
+FROM ${ENVIRONMENT} AS final
+
+# Install gcc and other necessary build tools
 RUN apt-get update && apt-get install -y \
     gcc \
     build-essential \
@@ -26,13 +19,6 @@ RUN apt-get update && apt-get install -y \
     libgl1 \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
-
-# Choose the final stage based on the ENVIRONMENT variable
-FROM cpu AS final
-ONBUILD ARG ENVIRONMENT
-
-# Conditionally switch to the GPU stage if ENVIRONMENT is GPU
-ONBUILD FROM ${ENVIRONMENT} AS final
 
 # Set the working directory
 WORKDIR /app
